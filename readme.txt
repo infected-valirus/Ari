@@ -1,4 +1,3 @@
-.gitattributes
 AriAniKeyCycle.mel
 AriAniKeyScale.mel
 AriAniKeySmooth.mel
