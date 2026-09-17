@@ -1,0 +1,47 @@
+//--------------------------------------------------------------------------
+//
+// ScriptName : AriReFreezeTransform
+// Contents   : フリーズしたトランスフォームを戻します。(トランスフォームの数値を原点からの距離にします)
+// Author     : A-RI
+// Since      : 2015/04
+// LastUpdate : 
+//
+//--------------------------------------------------------------------------
+
+
+global proc AriReFreezeTransform(){
+string $selectObj[]=`ls -sl`;
+for($obj in $selectObj){
+int $num=AriReFreezeT_AriListNum($obj);
+float $pos[3]=`xform -q -ws -rp $obj`;
+string $parents[]=`listRelatives -p -pa $obj`;
+string $wObj=$obj;
+if($parents[0]!=""){
+string $work[]=`parent -w $obj`;
+$wObj=$work[0];
+}
+move -rpr 0 0 0 $wObj;
+makeIdentity -apply true -t 1 -r 0 -s 0 -n 0 $wObj;
+move -rpr ($pos[0]) ($pos[1]) ($pos[2]) $wObj;
+if($parents[0]!=""){
+string $wObjParent[]=`parent  $wObj $parents[0]`;
+reorder -relative ($num+1) $wObjParent[0];
+}
+}
+}
+global proc int AriReFreezeT_AriListNum (string $obj){
+int $num;
+string $parent[]=`listRelatives -p -pa $obj`;
+string $children[];
+if($parent[0]=="")	$children=`ls -as`;
+else $children=		`listRelatives -c -pa $parent[0]`;
+int $i=0;
+for($child in $children){
+if($child == $obj){
+$num=$i;
+break;
+}
+$i++;
+}
+return $num;
+}

@@ -1,0 +1,323 @@
+//--------------------------------------------------------------------------
+// ScriptName : AriWireColor
+// Contents   : ワイヤーの色を変更します。
+// Since      : 2021/12
+// LastUpdate : 
+// Help       : http://cgjishu.net/blog-entry-346.html
+// Note       : 
+//------------------------------------------------------------
+
+
+proc int AriNumber2to10(int $boolList[]){
+	int $number;
+	int $baisu=1;
+	for($i=0;$i<size($boolList);$i++){
+		$number += $baisu*$boolList[$i];
+		$baisu = $baisu*2;
+	}
+	return $number;	
+}
+proc int[] AriNumber10to2(int $number){
+	int $boolList[];
+	int $baisu=pow(2,20);
+	$amari=$number;
+	for($i=20;$i>=0;$i--){
+		if($amari-$baisu>=0){
+			$amari=$amari-$baisu;
+			$boolList[$i]=1;
+		}
+		else $boolList[$i]=0;
+		$baisu=$baisu/2;
+	}
+	return $boolList;
+}
+global proc AriWireColor_Save(){
+	global string $AriWireColor_UI_TrShapeRB[];
+	global string $AriWireColor_UI_Frame[];
+	int $frame[5];
+	$frame[0] = `frameLayout -q -cl $AriWireColor_UI_Frame[0]`;
+	$frame[1] = `frameLayout -q -cl $AriWireColor_UI_Frame[1]`;
+	$frame[2] = `frameLayout -q -cl $AriWireColor_UI_Frame[2]`;
+	int $saveVal = AriNumber2to10($frame);
+	int $shapeTrue = false;
+	if(`radioButton -q -sl $AriWireColor_UI_TrShapeRB[1]`)$shapeTrue = true;
+	optionVar -intValue "AriWireColor_frame" $saveVal;
+	optionVar -intValue "AriWireColor_shape" $shapeTrue;
+}
+global proc AriWireColor_Load(){
+	global string $AriWireColor_UI_TrShapeRB[];
+	global string $AriWireColor_UI_Frame[];
+	int $frame[5];
+	$frame[0] = false;
+	$frame[1] = false;
+	$frame[2] = false;
+	int $loadVal;
+	if(`optionVar -exists "AriWireColor_frame"`){
+		int $loadVal = `optionVar -q "AriWireColor_frame"`;
+		$frame = AriNumber10to2($loadVal);
+	}
+	frameLayout -e -cl $frame[0] $AriWireColor_UI_Frame[0];
+	frameLayout -e -cl $frame[1] $AriWireColor_UI_Frame[1];
+	frameLayout -e -cl $frame[2] $AriWireColor_UI_Frame[2];
+	int $shapeTrue = true;
+	if(`optionVar -exists "AriWireColor_shape"`)$shapeTrue = `optionVar -q "AriWireColor_shape"`;
+	if($shapeTrue==false) radioButton -e -sl $AriWireColor_UI_TrShapeRB[0];
+	if($shapeTrue==true)  radioButton -e -sl $AriWireColor_UI_TrShapeRB[1];
+}
+global proc AriWireColor_ChangeUI(){
+	global string $AriWireColor_UI_TrShapeRB[];
+	global string $AriWireColor_UI_LineWidht_Row;
+	int $ShapeCbTrue = false;
+	if(`radioButton -q -sl $AriWireColor_UI_TrShapeRB[1]` == true) $ShapeCbTrue = true;
+	rowLayout -e -en $ShapeCbTrue $AriWireColor_UI_LineWidht_Row;
+	AriWireColor_Save();
+}
+global proc AriWireColor_modelEditorSel(int $mode){
+	string $panelName = "modelPanel4";
+	$panelName = `getPanel -wf`;
+	modelEditor -e -sel $mode $panelName;
+}
+global proc AriWireColor_LineWidth(int $mode){
+	global string $AriWireColor_UI_LineWidthFS;
+	global string $AriWireColor_UI_TrShapeRB[];
+	int $ShapeCbTrue = false;
+	if(`radioButton -q -sl $AriWireColor_UI_TrShapeRB[1]` == true) $ShapeCbTrue = true;
+	if($ShapeCbTrue == false)return;
+	float $val = `floatSliderGrp -q -v $AriWireColor_UI_LineWidthFS`;
+	if($mode==-1){
+		$val = -1;
+		floatSliderGrp -e -v -1 $AriWireColor_UI_LineWidthFS;
+	}
+	string $selectTfList[] = `ls -sl -transforms`;
+	for($tr in $selectTfList){
+		string $shapes[]=`listRelatives -s $tr`;	
+		for($shape in $shapes){
+			if(`attributeExists "lineWidth" $shape`){
+				setAttr ($shape+".lineWidth") $val;
+			}
+		}
+	}
+}
+global proc AriWireColor_LineWidthGet(){
+	global string $AriWireColor_UI_LineWidthFS;
+	global string $AriWireColor_UI_TrShapeRB[];
+	int $ShapeCbTrue = false;
+	if(`radioButton -q -sl $AriWireColor_UI_TrShapeRB[1]` == true) $ShapeCbTrue = true;
+	if($ShapeCbTrue == false)return;
+	float $val;
+	string $selectTfList[] = `ls -sl -transforms`;
+	string $shapes[]=`listRelatives -s  $selectTfList`;	
+	if(size($shapes)==0)return;
+	string $shape = $shapes[size($shapes)-1];
+	if(`attributeExists "lineWidth" $shape`){
+		$val = `getAttr ($shape+".lineWidth") `;
+	}
+	floatSliderGrp -e -v $val $AriWireColor_UI_LineWidthFS;
+}
+global proc AriWireColor_RGBGet(){
+	global string $AriWireColor_UI_TrShapeRB[];
+	global string $AriWireColor_UI_RGB;
+	string $selectTfList[] = `ls -sl -tr`;
+	float $rgb[];
+	string $tr = $selectTfList[0];
+	int $ShapeCbTrue = false;
+	if(`radioButton -q -sl $AriWireColor_UI_TrShapeRB[1]` == true) $ShapeCbTrue = true;
+	int $shapeTrue = $ShapeCbTrue;
+	if(`nodeType $tr` == "joint"){
+		$shapeTrue = false;
+	}
+	if($shapeTrue){
+		string $shapes[] = `listRelatives -s $tr`;
+		for($shape in $shapes){
+			 $rgb = `getAttr ($shape + ".overrideColorRGB")`;
+		}
+	}
+	else{
+		$rgb = `getAttr ($tr + ".overrideColorRGB")`;
+	}
+	colorSliderGrp -e -rgb $rgb[0] $rgb[1] $rgb[2] $AriWireColor_UI_RGB;
+}
+global proc AriWireColor_wire(int $index, int $type){
+	global string $AriWireColor_UI_IndexRgbRB[];
+	global string $AriWireColor_UI_TrShapeRB[];
+	global string $AriWireColor_UI_RGB;
+	int $ShapeCbTrue = false;
+	if(`radioButton -q -sl $AriWireColor_UI_TrShapeRB[1]` == true) $ShapeCbTrue = true;
+	float $rgb[];
+	$rgb = `colorSliderGrp -q -rgb $AriWireColor_UI_RGB`;
+	radioButton -e -sl $AriWireColor_UI_IndexRgbRB[$type];
+	string $selectTfList[] = `ls -sl -tr`;
+	for($tr in $selectTfList){
+		int $shapeTrue = $ShapeCbTrue;
+		if(`nodeType $tr` == "joint"){
+			$shapeTrue = false;
+		}
+		if($shapeTrue){
+			string $shapes[] = `listRelatives -s $tr`;
+			for($shape in $shapes){
+				setAttr ($shape + ".overrideEnabled") 1;
+				setAttr ($shape + ".overrideRGBColors") $type; 
+				if($type == 0)	setAttr ($shape + ".overrideColor") $index;
+				else			setAttr ($shape + ".overrideColorRGB") $rgb[0] $rgb[1] $rgb[2];
+			}
+		}
+		else{
+			setAttr ($tr + ".overrideEnabled") 1;
+			setAttr ($tr + ".overrideRGBColors") $type; 
+			if($type == 0)	setAttr ($tr + ".overrideColor") $index;
+			else			setAttr ($tr + ".overrideColorRGB") $rgb[0] $rgb[1] $rgb[2];
+		}
+	}
+}
+global proc AriWireColor_overrideONOFF(int $val){
+	global string $AriWireColor_UI_TrShapeRB[];
+	int $ShapeCbTrue = false;
+	if(`radioButton -q -sl $AriWireColor_UI_TrShapeRB[1]` == true) $ShapeCbTrue = true;
+	string $selectTfList[] = `ls -sl -transforms`;
+	for($tr in $selectTfList){
+		int $shapeTrue = $ShapeCbTrue;
+		if(`nodeType $tr` == "joint"){
+			$shapeTrue = false;
+		}
+		if($shapeTrue){
+			string $shapes[]=`listRelatives -s $tr`;
+			for($shape in $shapes){
+				setAttr ($shape+".overrideEnabled") $val;
+			}
+		}
+		else{
+			setAttr ($tr+".overrideEnabled") $val;
+		}
+	}
+}
+global proc AriWireColor_IndexRGBChange(){
+	global string $AriWireColor_UI_IndexRgbRB[];
+	global string $AriWireColor_UI_TrShapeRB[];
+	int $ShapeCbTrue = false;
+	if(`radioButton -q -sl $AriWireColor_UI_TrShapeRB[1]` == true) $ShapeCbTrue = true;
+	int $type = 0;
+	if(`radioButton -q -sl $AriWireColor_UI_IndexRgbRB[1]` == 1)$type = 1;
+	string $selectTfList[] = `ls -sl -tr`;
+	for($tr in $selectTfList){
+		int $shapeTrue = $ShapeCbTrue;
+		if(`nodeType $tr` == "joint"){
+			$shapeTrue = false;
+		}
+		if($shapeTrue){
+			string $shapes[] = `listRelatives -s $tr`;
+			for($shape in $shapes){
+				setAttr ($shape + ".overrideRGBColors") $type; 
+			}
+		}
+		else{
+			setAttr ($tr + ".overrideRGBColors") $type; 
+		}
+	}
+}
+global proc AriWireColor_windowSize(){
+	window -e -h 50 AriWireColor;
+	AriWireColor_Save();
+}
+global proc AriWireColor(){
+	global string $AriWireColor_UI_TrShapeRB[];
+	global string $AriWireColor_UI_IndexRgbRB[];
+	global string $AriWireColor_UI_RGB;
+	global string $AriWireColor_UI_LineWidthFS;
+	global string $AriWireColor_UI_Frame[];
+	global string $AriWireColor_UI_LineWidht_Row;
+	if((`window -ex  AriWireColor`)==true)deleteUI AriWireColor;
+	window -title "AriWireColor"  -w 300 -h 300 AriWireColor;
+	columnLayout -adj true;
+	$AriWireColor_UI_Frame[0] = `frameLayout -l "Color" -cll true -cc "AriWireColor_windowSize();" -ec "AriWireColor_windowSize();"`;
+	columnLayout -adj true;
+	radioCollection;
+	rowLayout -nc 5 -adj 3;
+	$AriWireColor_UI_TrShapeRB[0] = `radioButton -l "Transform" -onc "AriWireColor_ChangeUI()"`;
+	$AriWireColor_UI_TrShapeRB[1] = `radioButton -l "Shape"     -onc "AriWireColor_ChangeUI()" -sl`;
+	text -l "";
+	button -l "Override ON"  -w 80 -c ("AriWireColor_overrideONOFF(1)");
+	button -l "Override OFF" -w 80 -c ("AriWireColor_overrideONOFF(0)");
+	setParent..;
+	radioCollection;
+	rowLayout -nc 2 -adj 2;
+	$AriWireColor_UI_IndexRgbRB[0] = `radioButton -l "Index  " -sl -onc "AriWireColor_IndexRGBChange()"`;
+	separator;
+	setParent..;
+	rowLayout -nc 4;
+	button -l "Default" -bgc (0.5) (0.5) (0.5) -w 60 -h 20 -c ("AriWireColor_wire(0,0)");
+	separator -hr false -h 24 -w 10;
+	setParent..;
+	int $num = 1;
+	for($jj=0; $jj<3; $jj++ ){
+		string $buttons[];
+		string $form = `formLayout -w 60 -h 20`;
+		for($ii=0; $ii<10; $ii++ ){
+			vector $rgb = `colorIndex -q $num`;
+			$buttons[$ii] = `button -l "" -bgc ($rgb.x) ($rgb.y) ($rgb.z) -w 10 -h 20 -c ("AriWireColor_wire("+$num+",0)" )`;
+			$num++;
+		}
+		setParent..;
+		formLayout -e
+		-af $buttons[0] "left"  0
+		-ap $buttons[0] "right" 0 10
+		-ap $buttons[1] "left"  0 10
+		-ap $buttons[1] "right" 0 20
+		-ap $buttons[2] "left"  0 20
+		-ap $buttons[2] "right" 0 30
+		-ap $buttons[3] "left"  0 30
+		-ap $buttons[3] "right" 0 40
+		-ap $buttons[4] "left"  0 40
+		-ap $buttons[4] "right" 0 50
+		-ap $buttons[5] "left" 0 50
+		-ap $buttons[5] "right" 0 60
+		-ap $buttons[6] "left" 0 60
+		-ap $buttons[6] "right" 0 70
+		-ap $buttons[7] "left" 0 70
+		-ap $buttons[7] "right" 0 80
+		-ap $buttons[8] "left" 0 80
+		-ap $buttons[8] "right" 0 90
+		-ap $buttons[9] "left" 0 90
+		-ap $buttons[9] "right" 0 100
+		$form;
+	}
+	rowLayout -nc 2 -adj 2;
+	$AriWireColor_UI_IndexRgbRB[1] = `radioButton -l "RGB  " -onc "AriWireColor_IndexRGBChange()"`;
+	separator;
+	setParent..;
+	rowLayout -nc 3 -adj 1;
+	$AriWireColor_UI_RGB = `colorSliderGrp -cc "AriWireColor_wire(0,1)"`;
+	button -l "Get" -c "AriWireColor_RGBGet()";;
+	button -l "Set" -c "AriWireColor_wire(0,1)";
+	setParent..;
+	setParent..;
+	setParent..;
+	$AriWireColor_UI_Frame[1] = `frameLayout -l "Line Width" -cll true -cc "AriWireColor_windowSize();" -ec "AriWireColor_windowSize();"`;
+	columnLayout -adj true;
+	$AriWireColor_UI_LineWidht_Row = `rowLayout -nc 4 -adj 2`;
+	button -l "Default" -c "AriWireColor_LineWidth(-1)";;
+	$AriWireColor_UI_LineWidthFS = `floatSliderGrp -field true -cc "AriWireColor_LineWidth(0)" -min -1 -max 10 -fmx 100 -w 10`;
+	button -l "Get" -c "AriWireColor_LineWidthGet()";
+	button -l "Set" -c "AriWireColor_LineWidth(0)";
+	setParent..;
+	setParent..;
+	setParent..;
+	$AriWireColor_UI_Frame[2] = `frameLayout -l "Preselection Highlight" -cll true -cc "AriWireColor_windowSize();" -ec "AriWireColor_windowSize();"`;
+	columnLayout -adj true;	
+	string $form = `formLayout`;
+	string $buttonOn  = `button -l "ON" -c "AriWireColor_modelEditorSel(1)"`;
+	string $buttonOff = `button -l "OFF" -c "AriWireColor_modelEditorSel(0)"`;
+	setParent..;
+	formLayout -e 
+	-af $buttonOn "left" 0
+	-ap $buttonOn "right" 0 50
+	-ap $buttonOff "left"  0 50
+	-af $buttonOff "right" 0 
+	$form;
+	setParent..;
+	setParent..;
+	setParent..;
+	showWindow;
+	AriWireColor_Load();
+	AriWireColor_ChangeUI();
+	AriWireColor_windowSize();
+}

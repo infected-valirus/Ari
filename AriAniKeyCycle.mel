@@ -1,0 +1,273 @@
+//--------------------------------------------------------------------------
+//
+// ScriptName : AriAniKeyCycle
+// Contents   : 最初と最後のキーを合わせてスムーズにループさせる
+// Author     : Ari
+// Since      : 2019/02
+// LastUpdate : 2022/04/10 再生範囲対応 オブジェクト選択に対応
+//              2019/07/07 接線分割とウェイトに対応
+// Help       : http://cgjishu.net/blog-entry-268.html
+//
+//--------------------------------------------------------------------------
+
+
+
+
+
+proc int[] AriNumber10to2(int $number){
+	int $boolList[];
+	int $baisu=pow(2,20);
+	$amari=$number;
+	for($i=20;$i>=0;$i--){
+		if($amari-$baisu>=0){
+			$amari=$amari-$baisu;
+			$boolList[$i]=1;
+		}
+		else $boolList[$i]=0;
+		$baisu=$baisu/2;
+	}
+	return $boolList;	
+}
+proc int AriNumber2to10(int $boolList[]){
+	int $number;
+	int $baisu=1;
+	for($i=0;$i<size($boolList);$i++){
+		$number += $baisu*$boolList[$i];
+		$baisu = $baisu*2;
+	}
+	return $number;	
+}
+proc AriAniKeyCycle_Save(){
+	global string $AriAniKeyCycle_UI_StartEndRadio[];
+	global string $AriAniKeyCycle_UI_AngleChackBox;
+	global string $AriAniKeyCycle_UI_PosChackBox;
+	global string $AriAniKeyCycle_UI_AllRadio[];
+	int $endFit = true;
+	int $angleTrue = true;
+	int $postionTrue = true;
+	int $rangeMode = 0;
+	if(`radioButton -q -sl $AriAniKeyCycle_UI_StartEndRadio[0]` == true)	$endFit = true;
+	else																	$endFit = false;
+	$angleTrue   = `checkBox -q -v $AriAniKeyCycle_UI_AngleChackBox`;
+	$postionTrue = `checkBox -q -v $AriAniKeyCycle_UI_PosChackBox`;
+	if(`radioButton -q -sl $AriAniKeyCycle_UI_AllRadio[0]` == true)	$rangeMode = 0;
+	if(`radioButton -q -sl $AriAniKeyCycle_UI_AllRadio[1]` == true)	$rangeMode = 1;
+	if(`radioButton -q -sl $AriAniKeyCycle_UI_AllRadio[2]` == true)	$rangeMode = 2;
+	int $trueArray[];
+	$trueArray[0] = $endFit;
+	$trueArray[1] = $postionTrue;
+	$trueArray[2] = $angleTrue;
+	$trueArray[$rangeMode+3] = true;
+	int $saveInt = AriNumber2to10($trueArray);
+	optionVar -iv "AriAniKeyCycle_checkBox" $saveInt;
+}
+global proc AriAniKeyCycle_GO(int $mode){
+	global string $AriAniKeyCycle_UI_StartEndRadio[];
+	global string $AriAniKeyCycle_UI_AngleChackBox;
+	global string $AriAniKeyCycle_UI_PosChackBox;
+	global string $AriAniKeyCycle_UI_AllRadio[];
+	AriAniKeyCycle_Save();
+	int $endFit = true;
+	int $angleTrue = true;
+	int $postionTrue = true;
+	int $rangeMode = 0;
+	if(`radioButton -q -sl $AriAniKeyCycle_UI_StartEndRadio[0]` == true)	$endFit = true;
+	else																	$endFit = false;
+	$angleTrue   = `checkBox -q -v $AriAniKeyCycle_UI_AngleChackBox`;
+	$postionTrue = `checkBox -q -v $AriAniKeyCycle_UI_PosChackBox`;
+	if(`radioButton -q -sl $AriAniKeyCycle_UI_AllRadio[0]` == true)	$rangeMode = 0;
+	if(`radioButton -q -sl $AriAniKeyCycle_UI_AllRadio[1]` == true)	$rangeMode = 1;
+	if(`radioButton -q -sl $AriAniKeyCycle_UI_AllRadio[2]` == true)	$rangeMode = 2;
+	float $rangeMinTime = `playbackOptions -q -min`;
+	float $rangeMaxTime = `playbackOptions -q -max`;
+	print $rangeMinTime;
+	print " ";
+	print $rangeMaxTime;
+	string $aniCurveList[] = `keyframe -q -sl -name`;
+	if(size($aniCurveList)==0){
+		string $selList[] = `ls -sl -tr`;
+		$aniCurveList = `listConnections -s true -type "animCurve" $selList`;
+	}
+	for($curve in $aniCurveList){
+		print ($curve+"\n");
+		int   $select_indexList[]  = `keyframe -sl -q -indexValue  $curve`; 
+		float $select_timeList[]   = `keyframe -sl -q -timeChange  $curve`; 
+		float $select_valueList[]  = `keyframe -sl -q -valueChange $curve`; 
+		int   $all_indexList[]  = `keyframe -q -indexValue  $curve`;  
+		float $all_timeList[]   = `keyframe -q -timeChange  $curve` ; 
+		float $all_valList[]    = `keyframe -q -valueChange $curve`;  
+		int   $all_lock[]      = `keyTangent -q -lock $curve`;     
+		float $all_angle_In[]  = `keyTangent -q -inAngle  $curve`;
+		float $all_angle_Out[] = `keyTangent -q -outAngle $curve`;
+		print $all_timeList;
+		int   $weightTangentTrue[] = `keyTangent -q -weightedTangents $curve`;
+		float $all_weight_In[]     = `keyTangent -q -inWeight  $curve`;
+		float $all_weight_Out[]    = `keyTangent -q -outWeight $curve`;
+		int $baseIndex;
+		int $targetIndex;
+		float $targetValue;
+		float $targetAngle_In;  
+		float $targetAngle_Out; 
+		int   $target_lock;
+		float $targetWeight_In;  
+		float $targetWeight_Out; 
+		if($rangeMode==0){
+			if($endFit){
+				$targetIndex = $all_indexList[size($all_indexList)-1];
+				$targetValue = $all_valList[0];
+				$targetAngle_In  = $all_angle_In[0];
+				$targetAngle_Out = $all_angle_Out[0];
+				$target_lock     = $all_lock[0];
+				$targetWeight_In  = $all_weight_In[0]; 
+				$targetWeight_Out = $all_weight_Out[0]; 
+			}
+			else{
+				$targetIndex = $all_indexList[0];
+				$targetValue = $all_valList[size($all_valList)-1];
+				$target_lock     = $all_lock[size($all_lock)-1];
+				$targetAngle_In  = $all_angle_In[size($all_angle_In)-1];
+				$targetAngle_Out = $all_angle_Out[size($all_angle_Out)-1];
+				$targetWeight_In  = $all_weight_In[size($all_weight_In)-1]; 
+				$targetWeight_Out = $all_weight_Out[size($all_weight_Out)-1]; 
+			}
+		}
+		if($rangeMode==1){
+			if($endFit){
+				$baseIndex   = $select_indexList[0]; 							
+				$targetIndex = $select_indexList[size($select_indexList)-1];	
+				$targetValue = $select_valueList[0];
+			}
+			else{
+				$baseIndex   = $select_indexList[size($select_indexList)-1];
+				$targetIndex = $select_indexList[0];
+				$targetValue = $select_valueList[size($select_valueList)-1];
+			}
+			int   $select_lock[]      = `keyTangent -index $baseIndex -q -lock $curve`;
+			float $select_angle_Out[] = `keyTangent -index $baseIndex -q -outAngle $curve`;
+			float $select_angle_In[]  = `keyTangent -index $baseIndex -q -inAngle  $curve`;
+			float $select_weight_In[]  = `keyTangent -index $baseIndex -q -inWeight  $curve`;
+			float $select_weight_Out[] = `keyTangent -index $baseIndex -q -outWeight $curve`;
+			$targetAngle_Out = $select_angle_Out[0];
+			$targetAngle_In  = $select_angle_In[0];
+			$target_lock     = $select_lock[0];
+			$targetWeight_In  = $select_weight_In[0];  
+			$targetWeight_Out = $select_weight_Out[0]; 
+		}
+		if($rangeMode==2){
+			int $startIndex = 0;
+			int $endIndex   = 0;
+			int $startTrue = false;
+			int $endTrue   = false;
+			for($ii=0; $ii<size($all_timeList); $ii++){
+				if($all_timeList[$ii] == $rangeMinTime){
+					$startTrue  = true;
+					$startIndex = $ii;
+				}
+				if($all_timeList[$ii] == $rangeMaxTime){
+					$endTrue   = true;
+					$endIndex  = $ii;
+				}
+			}
+			if($startTrue && $endTrue){
+				if($endFit){
+					$baseIndex        = $all_indexList[$startIndex]; 
+					$targetIndex      = $all_indexList[$endIndex];
+					$targetValue      = $all_valList[$startIndex];
+					$targetAngle_In   = $all_angle_In[$startIndex];
+					$targetAngle_Out  = $all_angle_Out[$startIndex];
+					$target_lock      = $all_lock[$startIndex];
+					$targetWeight_In  = $all_weight_In[$startIndex]; 
+					$targetWeight_Out = $all_weight_Out[$startIndex]; 
+				}
+				else{
+					$baseIndex        = $all_indexList[$endTrue]; 
+					$targetIndex      = $all_indexList[$startIndex];
+					$targetValue      = $all_valList[$endIndex];
+					$targetAngle_In   = $all_angle_In[$endIndex];
+					$targetAngle_Out  = $all_angle_Out[$endIndex];
+					$target_lock      = $all_lock[$endIndex];
+					$targetWeight_In  = $all_weight_In[$endIndex]; 
+					$targetWeight_Out = $all_weight_Out[$endIndex]; 
+				}
+			}
+			else{
+				print "キーがない\n";
+				continue;
+			}
+		}
+		if($postionTrue) keyframe -e -index $targetIndex -valueChange $targetValue $curve;
+		if($angleTrue){
+			keyTangent -e -index $targetIndex -lock     false $curve;
+			keyTangent -e -index $targetIndex -outAngle $targetAngle_Out $curve;
+			keyTangent -e -index $targetIndex -inAngle  $targetAngle_In  $curve;
+			if($weightTangentTrue[0] == true){
+				keyTangent -e  -index $targetIndex -inWeight  $targetWeight_In  $curve;
+				keyTangent -e  -index $targetIndex -outWeight $targetWeight_Out $curve;
+			}
+			keyTangent -e -index $targetIndex -lock     $target_lock $curve;
+		}
+	}
+}
+global proc AriAniKeyCycle_RengeGet(){
+	global string $AriAniKeyCycle_UI_RangeFloatF[];
+	float $rangeMinTime = `playbackOptions -q -min`;
+	float $rangeMaxTime = `playbackOptions -q -max`;
+	floatField -e -v $rangeMinTime  $AriAniKeyCycle_UI_RangeFloatF[0];
+	floatField -e -v $rangeMaxTime  $AriAniKeyCycle_UI_RangeFloatF[1];
+}
+global proc AriAniKeyCycle(){
+	global string $AriAniKeyCycle_UI_StartEndRadio[];
+	global string $AriAniKeyCycle_UI_AngleChackBox;
+	global string $AriAniKeyCycle_UI_PosChackBox;
+	global string $AriAniKeyCycle_UI_AllRadio[];
+	global string $AriAniKeyCycle_UI_RangeFloatF[];
+	int $saveInt=15;
+	if(`optionVar -exists "AriAniKeyCycle_checkBox"`) $saveInt = `optionVar -q "AriAniKeyCycle_checkBox"`;
+	int $trueArray[] = AriNumber10to2($saveInt);
+	int $endFit      = $trueArray[0];
+	int $postionTrue = $trueArray[1];
+	int $angleTrue   = $trueArray[2];
+	int $rangeMode = 0;
+	if($trueArray[4])$rangeMode = 1;
+	if($trueArray[5])$rangeMode = 2;
+	if((`window -ex  AriAniKeyCycle`)==true)deleteUI AriAniKeyCycle;
+	window -tlb true -title "AriAniKeyCycle"  -w 200 -h 50  AriAniKeyCycle;
+	string $form = `formLayout`;
+	string $column = `columnLayout -adj true`;
+	rowLayout -nc 3;
+	radioCollection;
+	$AriAniKeyCycle_UI_AllRadio[0] = `radioButton -w 110 -label "StartEnd Key" -sl`;
+	$AriAniKeyCycle_UI_AllRadio[1] = `radioButton -label "Select Key"`;
+	setParent..;
+	rowLayout -nc 3;
+	$AriAniKeyCycle_UI_AllRadio[2] = `radioButton -label "Playback Range Key"`;
+	$AriAniKeyCycle_UI_RangeFloatF[0] = `floatField -vis false -pre 2`;
+	$AriAniKeyCycle_UI_RangeFloatF[1] = `floatField -vis false -pre 2`;
+	setParent..;
+	separator;
+	rowLayout -nc 3;
+	radioCollection;
+	$AriAniKeyCycle_UI_StartEndRadio[0] = `radioButton -w 110 -label "Start > End " -sl`;
+	$AriAniKeyCycle_UI_StartEndRadio[1] = `radioButton -label "Start < End "`;
+	setParent..;
+	separator;
+	rowLayout -nc 3;
+	$AriAniKeyCycle_UI_PosChackBox   = `checkBox -w 110 -label "Position" -value $postionTrue`;
+	$AriAniKeyCycle_UI_AngleChackBox = `checkBox -label "Angle" -value $angleTrue `;
+	setParent..;
+	if(!$endFit)radioButton  -e -sl $AriAniKeyCycle_UI_StartEndRadio[1];
+	radioButton -e -sl $AriAniKeyCycle_UI_AllRadio[$rangeMode];
+	setParent..;
+	string $button = `button -h 30 -l "Apply" -c "AriAniKeyCycle_GO(0)"`;
+	setParent..;
+	formLayout -e
+	-af $column "left"   0
+	-af $column "right"  0
+	-af $column "top" 0
+	-ac $button "top"    0 $column
+	-af $button "left"   0
+	-af $button "right"  0
+	-af $button "bottom" 0
+	$form;
+	showWindow;
+}

@@ -1,0 +1,305 @@
+//--------------------------------------------------------------------------
+//
+// ScriptName : AriAniKeyScale
+// Contents   : アニメーションのキーをスケールするツール。
+// Author     : Ari
+// URL        : cgjishu.net
+// Since      : 2018/08
+// LastUpdate : 
+//
+//--------------------------------------------------------------------------
+
+
+proc int AriNumber2to10(int $boolList[]){
+	int $number;
+	int $baisu=1;
+	for($i=0;$i<size($boolList);$i++){
+		$number += $baisu*$boolList[$i];
+		$baisu = $baisu*2;
+	}
+	return $number;	
+}
+proc int[] AriNumber10to2(int $number){
+	int $boolList[];
+	int $baisu=pow(2,20);
+	$amari=$number;
+	for($i=20;$i>=0;$i--){
+		if($amari-$baisu>=0){
+			$amari=$amari-$baisu;
+			$boolList[$i]=1;
+		}
+		else $boolList[$i]=0;
+		$baisu=$baisu/2;
+	}
+	return $boolList;
+}
+proc settingSave(){
+	global string $AriAniKeyScale_UI_Frame[];
+	global string $AriAniKeyScale_UI_valRadio[];
+	global string $AriAniKeyScale_UI_valScale[];
+	global string $AriAniKeyScale_UI_timeRadio[];
+	global string $AriAniKeyScale_UI_timeScale[];
+	float $timePivot    = `floatField -q -v $AriAniKeyScale_UI_timeScale[2]`;
+	float $timeAbsolute = `floatField -q -v $AriAniKeyScale_UI_timeScale[1]`;
+	float $timeScale    = `floatField -q -v $AriAniKeyScale_UI_timeScale[0]`;
+	optionVar -floatValue "AriAniKeyScale_timePivot"    $timePivot;
+	optionVar -floatValue "AriAniKeyScale_timeAbsolute" $timeAbsolute;
+	optionVar -floatValue "AriAniKeyScale_timeScale"    $timeScale;
+	float $valPivot    = `floatField -q -v $AriAniKeyScale_UI_valScale[2]`;
+	float $valAbsolute = `floatField -q -v $AriAniKeyScale_UI_valScale[1]`;
+	float $valScale    = `floatField -q -v $AriAniKeyScale_UI_valScale[0]`;
+	optionVar -floatValue "AriAniKeyScale_valPivot"    $valPivot;
+	optionVar -floatValue "AriAniKeyScale_valAbsolute" $valAbsolute;
+	optionVar -floatValue "AriAniKeyScale_valScale"    $valScale;
+	int $timeSelect = 1;
+	for($i=0;$i<4;$i++){
+		if(`radioButton -q -sl $AriAniKeyScale_UI_timeRadio[$i]`){
+			$timeSelect = $i;
+		}
+	}
+	optionVar -intValue "AriAniKeyScale_timeRadio" $timeSelect;
+	int $valueSelect = 1;
+	for($i=0;$i<4;$i++){
+		if(`radioButton -q -sl $AriAniKeyScale_UI_valRadio[$i]`){
+			$valueSelect = $i;
+		}
+	}
+	optionVar -intValue "AriAniKeyScale_valueRadio" $valueSelect;
+	int $closeVal[3];
+	$closeVal[0] = `frameLayout -q -cl $AriAniKeyScale_UI_Frame[0]`;
+	$closeVal[1] = `frameLayout -q -cl $AriAniKeyScale_UI_Frame[1]`;
+	int $closeVal10 = AriNumber2to10($closeVal);
+	optionVar -intValue "AriAniKeyScale_frameCollapse" $closeVal10;
+}
+proc settingLoad(){
+	global string $AriAniKeyScale_UI_Frame[];
+	global string $AriAniKeyScale_UI_valRadio[];
+	global string $AriAniKeyScale_UI_valScale[];
+	global string $AriAniKeyScale_UI_timeRadio[];
+	global string $AriAniKeyScale_UI_timeScale[];
+	float $timePivot    = 0;
+	float $timeAbsolute = 100;
+	float $timeScale    = 2;
+	if(`optionVar -exists "AriAniKeyScale_timePivot"`)    $timePivot    = `optionVar -q "AriAniKeyScale_timePivot"`;
+	if(`optionVar -exists "AriAniKeyScale_timeAbsolute"`) $timeAbsolute = `optionVar -q "AriAniKeyScale_timeAbsolute"`;
+	if(`optionVar -exists "AriAniKeyScale_timeScale"`)    $timeScale    = `optionVar -q "AriAniKeyScale_timeScale"`;	
+	floatField -e -v $timePivot    $AriAniKeyScale_UI_timeScale[2];
+	floatField -e -v $timeAbsolute $AriAniKeyScale_UI_timeScale[1];
+	floatField -e -v $timeScale    $AriAniKeyScale_UI_timeScale[0];
+	float $valPivot    = 0;
+	float $valAbsolute = 1;
+	float $valScale    = 2;
+	if(`optionVar -exists "AriAniKeyScale_valPivot"`)    $valPivot    = `optionVar -q "AriAniKeyScale_valPivot"`;
+	if(`optionVar -exists "AriAniKeyScale_valAbsolute"`) $valAbsolute = `optionVar -q "AriAniKeyScale_valAbsolute"`;
+	if(`optionVar -exists "AriAniKeyScale_valScale"`)    $valScale    = `optionVar -q "AriAniKeyScale_valScale"`;	
+	floatField -e -v $valPivot    $AriAniKeyScale_UI_valScale[2];
+	floatField -e -v $valAbsolute $AriAniKeyScale_UI_valScale[1];
+	floatField -e -v $valScale    $AriAniKeyScale_UI_valScale[0];
+	int $timeSelect = 1;
+	if(`optionVar -exists "AriAniKeyScale_timeRadio"`) $timeSelect = `optionVar -q "AriAniKeyScale_timeRadio"`;
+	radioButton -e -sl $AriAniKeyScale_UI_timeRadio[$timeSelect];
+	int $valueSelect = 1;
+	if(`optionVar -exists "AriAniKeyScale_valueRadio"`) $valueSelect = `optionVar -q "AriAniKeyScale_valueRadio"`;
+	radioButton -e -sl $AriAniKeyScale_UI_valRadio[$valueSelect];
+	int $closeVal[3];
+	$closeVal[0] = 0;
+	$closeVal[1] = 0;
+	if(`optionVar -exists "AriAniKeyScale_frameCollapse"`){
+		int $loadVal = `optionVar -q "AriAniKeyScale_frameCollapse"`;
+		$closeVal = AriNumber10to2($loadVal);
+	}
+	frameLayout -e -cl $closeVal[0] $AriAniKeyScale_UI_Frame[0];
+	frameLayout -e -cl $closeVal[1] $AriAniKeyScale_UI_Frame[1];
+}
+global proc AriAniKeyScale_GO(int $plusTrue, int $valTrue){
+	global string $AriAniKeyScale_UI_valScale[];
+	global string $AriAniKeyScale_UI_timeScale[];
+	global string $AriAniKeyScale_UI_valRadio[];
+	global string $AriAniKeyScale_UI_timeRadio[];
+	float $scale = 2;
+	float $targetScale = 2;
+	float $pivVal = 0;
+	if($valTrue){
+		$scale       = `floatField -q -v $AriAniKeyScale_UI_valScale[0]`;
+		$targetScale = `floatField -q -v $AriAniKeyScale_UI_valScale[1]`;
+		$pivVal      = `floatField -q -v $AriAniKeyScale_UI_valScale[2]`;
+	}
+	else{
+		$scale       = `floatField -q -v $AriAniKeyScale_UI_timeScale[0]`;
+		$targetScale = `floatField -q -v $AriAniKeyScale_UI_timeScale[1]`;
+		$pivVal      = `floatField -q -v $AriAniKeyScale_UI_timeScale[2]`;
+	}
+	if($plusTrue==0) $scale = 1.0/$scale;
+	string $aniCurveList[]=`keyframe -q -sl -name`;
+	float $totalMax = 0;
+	float $totalMin = 0;
+	float $curveTotal=0;
+	for($curve in $aniCurveList){
+		int   $select_indexList[]  = `keyframe -sl -q -indexValue  $curve`;
+		float $select_timeList[]   = `keyframe -sl -q -timeChange  $curve`;
+		float $select_valueList[]  = `keyframe -sl -q -valueChange $curve`;
+		int   $all_indexList[]  = `keyframe -q -indexValue  $curve`;
+		float $all_timeList[]   = `keyframe -q -timeChange  $curve`;
+		float $all_valList[]    = `keyframe -q -valueChange $curve`;
+		int $pivMode = 0;
+		if($valTrue){
+			if(`radioButton -q -sl $AriAniKeyScale_UI_valRadio[0]`)$pivMode = 0;
+			if(`radioButton -q -sl $AriAniKeyScale_UI_valRadio[1]`)$pivMode = 1;
+			if(`radioButton -q -sl $AriAniKeyScale_UI_valRadio[2]`)$pivMode = 2;
+			if(`radioButton -q -sl $AriAniKeyScale_UI_valRadio[3]`)$pivMode = 3;
+		}
+		else{
+			if(`radioButton -q -sl $AriAniKeyScale_UI_timeRadio[0]`)$pivMode = 0;
+			if(`radioButton -q -sl $AriAniKeyScale_UI_timeRadio[1]`)$pivMode = 1;
+			if(`radioButton -q -sl $AriAniKeyScale_UI_timeRadio[2]`)$pivMode = 2;
+			if(`radioButton -q -sl $AriAniKeyScale_UI_timeRadio[3]`)$pivMode = 3;	
+		}
+		float $max = 0;
+		float $min = 0;
+		float $total = 0;
+		for($j=0; $j < (size($select_indexList)); $j++){
+			int $selIndex = $select_indexList[$j];
+			float $value[];
+			if($valTrue)	$value = `keyframe -index $selIndex -q -valueChange $curve`;
+			else			$value = `keyframe -index $selIndex -q -timeChange $curve`;
+			if($j==0){
+				$max = $value[0];
+				$min = $value[0];
+			}
+			if($max < $value[0])$max = $value[0];
+			if($min > $value[0])$min = $value[0];
+			$total += $value[0];
+		}
+		float $center = ($max+$min)/2.0;
+		if($plusTrue==2){
+			$scale = $targetScale/($max-$min);
+		}
+		float $piv = 0;
+		if($pivMode==0)$piv = $min;
+		if($pivMode==1)$piv = $center;
+		if($pivMode==2)$piv = $max;
+		if($pivMode==3)$piv = $pivVal ;
+		if($plusTrue==3 || $plusTrue==4){
+			if($curveTotal==0){
+				$totalMax = $max;
+				$totalMin = $min;
+			}
+			if($totalMax < $max)$totalMax = $max;
+			if($totalMax > $min)$totalMin = $min;
+			$curveTotal++;
+			continue;
+		}
+		string $evalText = "scaleKey ";
+		for($j=0; $j < (size($select_indexList)); $j++){	
+			int $selIndex = $select_indexList[$j];
+			$evalText = $evalText + ("-index "+$selIndex+" ");
+		}
+		if($valTrue)$evalText = $evalText + ("-vs "+ $scale +"-vp "+ $piv+" "+$curve);
+		else		$evalText = $evalText + ("-ts "+ $scale +"-tp "+ $piv+" "+$curve);
+		eval $evalText;
+	}
+	if($plusTrue==3){
+		float $totalPiv = ($totalMax+$totalMin)/2.0;
+		if($valTrue)floatField -e -v $totalPiv $AriAniKeyScale_UI_valScale[2];
+		else 		floatField -e -v $totalPiv $AriAniKeyScale_UI_timeScale[2];
+	}
+	if($plusTrue==4){
+		float $size = $totalMax-$totalMin;
+		if($valTrue)floatField -e -v $size $AriAniKeyScale_UI_valScale[1];
+		else 		floatField -e -v $size $AriAniKeyScale_UI_timeScale[1];
+	}
+	settingSave();
+}
+global proc AriAniKeyScale_changeRadio(){
+	global string $AriAniKeyScale_UI_valScale[];
+	global string $AriAniKeyScale_UI_timeScale[];
+	global string $AriAniKeyScale_UI_valRadio[];
+	global string $AriAniKeyScale_UI_timeRadio[];
+	global string $AriAniKeyScale_UI_button[];
+	if(`radioButton -q -sl $AriAniKeyScale_UI_timeRadio[3]`){
+		button     -e -en true $AriAniKeyScale_UI_button[0];
+		floatField -e -en true $AriAniKeyScale_UI_timeScale[2];
+	}
+	else{
+		button     -e -en false $AriAniKeyScale_UI_button[0];
+		floatField -e -en false $AriAniKeyScale_UI_timeScale[2];
+	}
+	if(`radioButton -q -sl $AriAniKeyScale_UI_valRadio[3]`){
+		button     -e -en true $AriAniKeyScale_UI_button[1];
+		floatField -e -en true $AriAniKeyScale_UI_valScale[2];
+	}
+	else{
+		button     -e -en false $AriAniKeyScale_UI_button[1];
+		floatField -e -en false $AriAniKeyScale_UI_valScale[2];
+	}
+}
+global proc AriAniKeyScale_setWindowSize(){	
+	window -e -h 44 AriAniKeyScale;
+}
+global proc AriAniKeyScale(){
+	global string $AriAniKeyScale_UI_Frame[];
+	global string $AriAniKeyScale_UI_valRadio[];
+	global string $AriAniKeyScale_UI_valScale[];
+	global string $AriAniKeyScale_UI_timeRadio[];
+	global string $AriAniKeyScale_UI_timeScale[];
+	global string $AriAniKeyScale_UI_button[];
+	if((`window -ex  AriAniKeyScale`)==true)deleteUI AriAniKeyScale;
+	window -tlb 1 -title "AriAniKeyScale"  -w 200 -h 120  AriAniKeyScale;
+	columnLayout -adj true;
+	$AriAniKeyScale_UI_Frame[0] = `frameLayout -l "Time" -cll true -cl false -cc "AriAniKeyScale_setWindowSize()"`;
+	columnLayout -adj true;
+	radioCollection;
+	rowLayout -nc 4;
+	$AriAniKeyScale_UI_timeRadio[0] = `radioButton -label "Min"    -onc "AriAniKeyScale_changeRadio()"`;
+	$AriAniKeyScale_UI_timeRadio[1] = `radioButton -label "Center" -onc "AriAniKeyScale_changeRadio()" -sl`;
+	$AriAniKeyScale_UI_timeRadio[2] = `radioButton -label "Max"    -onc "AriAniKeyScale_changeRadio()"`;
+	setParent..;
+	rowLayout -nc 4;
+	$AriAniKeyScale_UI_timeRadio[3] = `radioButton -label "Input" -onc "AriAniKeyScale_changeRadio()"`;
+	$AriAniKeyScale_UI_timeScale[2] = `floatField -v 0`;
+	$AriAniKeyScale_UI_button[0]    = `button -w 30 -l "Get" -c "AriAniKeyScale_GO(3,0);"`;
+	setParent..;
+	rowLayout -nc 3 -adj 1;
+	$AriAniKeyScale_UI_timeScale[1] = `floatField -v 100`;
+	button -w 30 -l "Get" -c "AriAniKeyScale_GO(4,0);";
+	button -w 60 -l "Absolute" -c "AriAniKeyScale_GO(2,0);";
+	setParent..;
+	rowLayout -nc 4 -adj 1;
+	$AriAniKeyScale_UI_timeScale[0] = `floatField -v 1.5`;
+	button -w 20 -l "/" -c "AriAniKeyScale_GO(0,0);";
+	iconTextButton -w 70 -bgc 0.5 0.4 0.4 -i "constrainDragX.png" -c "AriAniKeyScale_GO(1,0);";
+	setParent..;
+	setParent..;
+	setParent..;
+	$AriAniKeyScale_UI_Frame[1] = `frameLayout -l "Value" -cll true -cl false -cc "AriAniKeyScale_setWindowSize()"`;
+	columnLayout -adj true;
+	radioCollection;
+	rowLayout -nc 4;
+	$AriAniKeyScale_UI_valRadio[0] = `radioButton -label "Min"    -onc "AriAniKeyScale_changeRadio()"`;
+	$AriAniKeyScale_UI_valRadio[1] = `radioButton -label "Center" -onc "AriAniKeyScale_changeRadio()" -sl`;
+	$AriAniKeyScale_UI_valRadio[2] = `radioButton -label "Max"    -onc "AriAniKeyScale_changeRadio()"`;
+	setParent..;
+	rowLayout -nc 4;
+	$AriAniKeyScale_UI_valRadio[3] = `radioButton -label "Input" -onc "AriAniKeyScale_changeRadio()"`;
+	$AriAniKeyScale_UI_valScale[2] = `floatField -v 0`;
+	$AriAniKeyScale_UI_button[1]   = `button -w 40 -l "Get" -c "AriAniKeyScale_GO(3,1);"`;
+	setParent..;
+	rowLayout -nc 3 -adj 1;
+	$AriAniKeyScale_UI_valScale[1] = `floatField -v 1`;
+	button -w 30 -l "Get" -c "AriAniKeyScale_GO(4,1);";
+	button -w 60 -l "Absolute" -c "AriAniKeyScale_GO(2,1);";
+	setParent..;
+	rowLayout -nc 4 -adj 1;
+	$AriAniKeyScale_UI_valScale[0] = `floatField -v 1.5`;
+	button -w 20 -l "/" -c "AriAniKeyScale_GO(0,1);";
+	iconTextButton -w 70 -bgc 0.4 0.5 0.4 -i "constrainDragY.png" -c "AriAniKeyScale_GO(1,1);";
+	setParent..;
+	setParent..;
+	setParent..;
+	setParent..;
+	showWindow;
+	refresh;
+	settingLoad();
+	AriAniKeyScale_changeRadio();
+	AriAniKeyScale_setWindowSize();
+}

@@ -1,0 +1,279 @@
+//--------------------------------------------------------------------------
+//
+// ScriptName : AriMirror
+// Contents   : オブジェクトのミラーを複製しマージします
+// Author     : A-RI
+// Since      : 2014/05
+// LastUpdate : 2015/04/05 バグ修正(途中エラー)。
+//				2015/04/02 選択項目の分離表示状態でミラー化しても非表示にならないように調整。
+//              2015/01/25 マージする頂点の閾値を小さく。
+//              2015/02/18 削除するポリゴンの閾値を小さくしました。。
+//
+//--------------------------------------------------------------------------
+
+
+
+global proc AriMirror(){
+
+global string $ARIDMMS_checkBox1;
+global string $ARIDMMS_checkBox2;
+global string $ARIDMMS_radiobutton1;
+global string $ARIDMMS_radiobuttonXYZ;
+global string $ARIDMMS_radiobuttonUV;
+if((`window -ex  AriMirror`)==true)deleteUI AriMirror;
+window -title "AriMirror"  -w 190 -h 170 AriMirror;
+$form = `formLayout`;
+$column=`columnLayout -rs 2`;
+rowLayout -nc 2 -cw2 70 130  ;
+text -label "反転軸:";
+$ARIDMMS_radiobuttonXYZ = `radioButtonGrp -nrb 3  -labelArray3 "X" "Y" "Z" -select 1 -cw3 50 50 50 `;
+setParent..;
+$ARIDMMS_checkBox1 = `checkBox -label "オブジェクトセンターマージ" -value 1`;
+separator -w 210 -h 6 -style "single";
+rowLayout -nc 2 -cw2 70 130  ;
+text -label "UV反転軸:";
+$ARIDMMS_radiobuttonUV = `radioButtonGrp -numberOfRadioButtons 3 -labelArray3 "U" "V" "なし" -select 1 -cw3 42 42 42 -cc "AriMirror_nonUV()"`;
+setParent..;
+rowLayout -nc 2 -cw2 70 130  ;
+text -label "UV反転座標:";
+$ARIDMMS_radiobutton1 = `radioButtonGrp -numberOfRadioButtons 3  -labelArray3 "0" "0.5" "1" -select 2 -cw3 42 42 42 `;
+setParent..;
+$ARIDMMS_checkBox2 = `checkBox -label "UVセンターマージ" -value 1`;
+setParent..;
+string $mirrorButton=`button  -h 30 -l "ミラー" -c "ARIDMMS_go"`;
+string $buttonL=`button  -l "- 消去" -c "deleteMinusMesh(0)"`;
+string $buttonR=`button  -l "+ 消去" -c "deleteMinusMesh(1)"`;
+setParent..;
+formLayout -e 
+-af $mirrorButton	"left" 0
+-af $mirrorButton	"right" 0
+-af $mirrorButton	"bottom" 0
+-af $buttonL	"left" 0
+-ap $buttonL	"right" 0 50
+-ac $buttonL	"bottom" 0 $mirrorButton
+-ap $buttonR	"left" 0 50
+-af $buttonR	"right" 0
+-ac $buttonR	"bottom" 0 $mirrorButton
+-af $column	"top" 0  
+-af $column	"left" 0
+-af $column	"right" 0
+-ac $column	"bottom" 0 $buttonL
+$form;
+showWindow;
+}
+global proc ARIDMMS_go()
+{
+global string $ARIDMMS_checkBox1;
+global string $ARIDMMS_checkBox2;
+global string $ARIDMMS_radiobutton1;
+global string $ARIDMMS_radiobuttonXYZ;
+global string $ARIDMMS_radiobuttonUV;
+string $objList[]=`ls -sl -tr`;
+if(size($objList)<=0){
+confirmDialog -title "反転マージ" -message "半分のオブジェクトを選択して実行してください";
+return;
+}
+delete -ch $objList ;
+int $centerMarge;
+int $uvCenterMarge;
+float $uvCenter;
+string $margeObj;
+int $jikuXYZ=0;
+int $jikuUV=0;
+$jikuXYZ=`radioButtonGrp -q -select $ARIDMMS_radiobuttonXYZ`;
+$jikuUV=`radioButtonGrp -q -select $ARIDMMS_radiobuttonUV`;
+if( `checkBox -q -value $ARIDMMS_checkBox1`)$centerMarge=1;
+else $centerMarge=0;
+if( `checkBox -q -value $ARIDMMS_checkBox2`)$uvCenterMarge=1;
+else $uvCenterMarge=0;
+if( `radioButtonGrp -q -select $ARIDMMS_radiobutton1`==1)$uvCenter=0;
+if( `radioButtonGrp -q -select $ARIDMMS_radiobutton1`==2)$uvCenter=0.5;
+if( `radioButtonGrp -q -select $ARIDMMS_radiobutton1`==3)$uvCenter=1;
+float $posXYZ;
+for($obj in $objList){
+string $parent[] =`listRelatives -p $obj`;
+string $obj2[] = `duplicate $obj`;
+string $copyObj = $obj2[0];
+makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 $copyObj;
+if($jikuXYZ==1) setAttr ($copyObj+".scaleX") -1;
+if($jikuXYZ==2) setAttr ($copyObj+".scaleY") -1;
+if($jikuXYZ==3) setAttr ($copyObj+".scaleZ") -1;
+string $uvMapList[]=`polyUVSet -q -allUVSets`;	
+float $pivotU=0;
+for($uvSet in $uvMapList){
+polyUVSet -cuv -uvSet $uvSet;
+string $vertex[] = `polyListComponentConversion -tuv $copyObj`;	
+string $uvs[] = `filterExpand -selectionMask 35 $vertex`;	
+if($jikuUV==1)polyEditUV -pu $uvCenter -su -1 -sv 1 $uvs;
+if($jikuUV==2)polyEditUV -pv $uvCenter -sv -1 -sv 1 $uvs;
+}
+string $margeList[];
+$margeList[0]=$copyObj;
+$margeList[1]=$obj;
+$margeObj=AriMirror_ARIMargeObjectsGo($margeList);
+float $scalePiv[]=`getAttr ($margeObj+".scalePivot")`;
+float $pivPos;
+if($jikuXYZ==1)$pivPos=$scalePiv[0];
+if($jikuXYZ==2)$pivPos=$scalePiv[1];
+if($jikuXYZ==3)$pivPos=$scalePiv[2];
+if($centerMarge){
+string $verList[] = `polyListComponentConversion -tv $margeObj`;	
+$verList = `filterExpand -selectionMask 31 $verList`;	
+string $margeVerList[];
+int $i=0;
+clear $margeVerList;
+for($ver in $verList){
+vector $vPos=`pointPosition -l $ver`;
+if($jikuXYZ==1) $posXYZ=$vPos.x;
+if($jikuXYZ==2) $posXYZ=$vPos.y;
+if($jikuXYZ==3) $posXYZ=$vPos.z;
+$posXYZ -= $pivPos;
+if($posXYZ < 0.0001 && $posXYZ > -0.0001){
+$margeVerList[$i]=$ver;
+$i++;
+}
+}
+if(size($margeVerList)>0){
+select -cl;
+select $margeVerList;
+polyMergeVertex -d 0.001 $margeVerList;	
+ConvertSelectionToContainedEdges;	
+polySoftEdge -a 180 -ch 1;		
+if($uvCenterMarge)polyMergeUV -d 0.01;	
+}
+}
+}
+delete -ch $margeObj;
+}
+global proc AriMirror_nonUV(){
+global string $ARIDMMS_checkBox1;
+global string $ARIDMMS_checkBox2;
+global string $ARIDMMS_radiobutton1;
+global string $ARIDMMS_radiobuttonXYZ;
+global string $ARIDMMS_radiobuttonUV;
+if(`radioButtonGrp -q -select $ARIDMMS_radiobuttonUV` == 3){
+radioButtonGrp -e -en 0 $ARIDMMS_radiobutton1;		
+}
+else{
+radioButtonGrp -e -en 1 $ARIDMMS_radiobutton1;	
+}
+}
+global proc deleteMinusMesh(int $plus)
+{
+global string $ARIDMMS_radiobuttonXYZ;
+string $poly[]=`ls -sl`;
+int $jikuXYZ;
+$jikuXYZ=`radioButtonGrp -q -select $ARIDMMS_radiobuttonXYZ`;
+$gosa=0.0001;
+string $vertex[] = `polyListComponentConversion -tv $poly`;
+string $vertexs[] = `filterExpand -selectionMask 31 $vertex`;
+float $scalePiv[]=`getAttr ($poly[0]+".scalePivot")`;
+float $pivPos;
+if($jikuXYZ==1)$pivPos=$scalePiv[0];
+if($jikuXYZ==2)$pivPos=$scalePiv[1];
+if($jikuXYZ==3)$pivPos=$scalePiv[2];
+string $zeroNum[];
+vector $verPlus_Pos[];
+string $verPlus_Num[];
+vector $verMinus_Pos[];
+string $verMinus_Num[];
+$coPlus=0;
+$coMinus=0;
+$coZero=0;
+for($ver in $vertexs){
+vector $pos=`pointPosition -l $ver`;
+float $posXYZ;
+if($jikuXYZ==1)$posXYZ=$pos.x;
+if($jikuXYZ==2)$posXYZ=$pos.y;
+if($jikuXYZ==3)$posXYZ=$pos.z;
+$posXYZ -= $pivPos;
+if($posXYZ<=$gosa && $posXYZ>=-1*$gosa){
+$zeroNum[$coZero]= $ver;
+$coZero++;
+}
+if($posXYZ>$gosa){
+$verPlus_Pos[$coPlus]=`pointPosition -l $ver`;
+$verPlus_Num[$coPlus]=$ver;
+$coPlus++;
+}
+if($posXYZ<-1*$gosa){
+$verMinus_Pos[$coMinus]=`pointPosition -l $ver`;
+$verMinus_Num[$coMinus]=$ver;
+$coMinus++;
+}
+}
+if($plus==1)	select $verPlus_Num;
+else	select $verMinus_Num;
+ConvertSelectionToFaces;
+delete;
+select $poly;
+}
+global proc AriMirror_ARIMargeObjects(){
+string $selectObj[]=`ls -sl -transforms`;
+if(size($selectObj)>=1)	AriMirror_ARIMargeObjectsGo($selectObj);
+}
+global proc string AriMirror_ARIMargeObjectsGo(string $selectObj[]){
+delete -ch;
+string $lastSelect=$selectObj[size($selectObj)-1];
+string $parent[]=`listRelatives -pa -p  $lastSelect`;
+string $setList[] = `ls -type "objectSet"`;
+string $menberSetList[];
+int $i=0;
+for($set in $setList){
+print $set;
+string $setMembers[]=`sets -q $set`;
+if(stringArrayContains($lastSelect, $setMembers)){
+$menberSetList[$i]=$set;
+$i++;
+}
+}
+int $lastObjNum=AriMirror_AriMOListNum($lastSelect);
+if($parent[0] != ""){
+string $parentName[]=`parent -w $lastSelect`;
+$lastSelect=$parentName[0];
+$selectObj[size($selectObj)-1]=$lastSelect;
+}
+makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 $selectObj;
+float $rotatePiv[]=`getAttr ($lastSelect+".rotatePivot")` ;
+float $scalePiv[]=`getAttr ($lastSelect+".scalePivot")` ;
+for($obj in $selectObj){
+string $meshs[]= `listRelatives -pa -s $obj`;
+if(size($meshs)>0){
+if(`getAttr($meshs[0]+".opposite")`==1){
+polyNormal -normalMode 0 -userNormalMode 0 $obj;
+setAttr ($meshs[0]+".opposite") 0;
+}
+}
+}
+delete -ch;
+string $marge[]=`polyUnite -ch 1 $selectObj`;
+setAttr ($marge[0]+".rotatePivot")  $rotatePiv[0]  $rotatePiv[1]  $rotatePiv[2];
+setAttr ($marge[0]+".scalePivot") $scalePiv[0] $scalePiv[1] $scalePiv[2];
+if($parent[0]!="")parent $marge[0] $parent[0] ;
+reorder -relative ($lastObjNum+1) $marge[0];
+delete -ch;
+if(!`isValidObjectName($lastSelect)`){
+$lastSelect=endString($lastSelect,size($lastSelect)-1);
+}
+string $margeName=`rename $marge[0] $lastSelect`;
+for($set in $menberSetList){
+sets -edit -forceElement $set $margeName;
+}
+return $margeName;
+}
+global proc int AriMirror_AriMOListNum (string $obj){
+int $num;
+string $parent[]=`listRelatives -p -pa $obj`;
+string $children[];
+if($parent[0]=="")	$children=`ls -as`;
+else $children=		`listRelatives -c -pa $parent[0]`;
+int $i=0;
+for($child in $children){
+if($child == $obj){
+$num=$i;
+break;
+}
+$i++;
+}
+return $num;
+}

@@ -1,0 +1,78 @@
+//--------------------------------------------------------------------------
+//
+// ScriptName : AriAniSetPlaybackRange
+// Contents   : 再生範囲の開始終了時間を選択したオブジェクトのキーに合わせます。
+// Author     : Ari
+// URL        : http://cgjishu.net/
+// Since      : 2017/07
+//
+//
+//--------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+proc float[] Get_minmax (float $valList[]){
+	float $min;
+	float $max;
+	float $minmax[2];
+	$min = $valList[0];
+	$max = $valList[0];
+	for($val in $valList){
+		if($min>$val)$min=$val;
+		if($max<$val)$max=$val;
+	}	$minmax[0]=$min;
+	$minmax[1]=$max;
+	return $minmax;
+}
+proc float[] GetStartEndKey(string $animCurveList[]){
+	float $minmaxList[];
+	int $j=0;
+	for($curve in $animCurveList){
+		float $timeList[]  =`keyframe -time ":" -q -timeChange $curve`;
+		float $minmax[] = Get_minmax($timeList);
+		$minmaxList[$j]=$minmax[0];
+		$j++;
+		$minmaxList[$j]=$minmax[1];
+		$j++;
+	}	
+	float $startend[] = (Get_minmax($minmaxList));
+	return $startend;
+}
+global proc AriAniSetPlaybackRange(){
+	int $childTrue = false;
+	string $selList[] = `ls -sl -tr`;
+	string $animCurveList[];
+	clear $animCurveList;
+	if (size($selList)>0){
+		string $obj;
+		for($obj in $selList){
+			string $workCurve[]=`listConnections -s true -type "animCurve" $obj`;
+			$animCurveList = stringArrayCatenate ($animCurveList, $workCurve);
+			if($childTrue){
+				string $children[] = `listRelatives -pa -c -ad -type "transform" $obj`;
+				string $child = "";
+				for($child in $children){
+					clear $workCurve;
+					$workCurve=`listConnections -s true -type "animCurve" $child`;
+					$animCurveList = stringArrayCatenate ($animCurveList, $workCurve);
+				}
+			}
+		}
+	}
+	else{
+		$animCurveList = `ls -type "animCurve"`;
+	}
+	if(size($animCurveList)>0){
+		print $animCurveList;
+		float $startEnd[] = GetStartEndKey($animCurveList);
+		print $startEnd;
+		playbackOptions -e -min $startEnd[0] -max $startEnd[1];
+	}
+}
+
+

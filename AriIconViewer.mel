@@ -1,0 +1,374 @@
+//--------------------------------------------------------------------------
+//
+// ScriptName : AriIconViewer
+// Contents   : Mayaに登録されているデフォルトアイコンを一覧
+// Author     : Ari
+// URL        : http://cgjishu.net/
+// Since      : 2014/05
+// LastUpdate : 2024/09/23 UI変更 サイズ別表示機能など追加
+//            : 2018/11/25
+// Help       : http://cgjishu.net/blog-entry-5.html
+//
+//--------------------------------------------------------------------------
+
+global proc AriIconViewer_ClipBoad(){
+	global string $AriIconViewerPreviewLabel;
+	string $path = `textField -q -text $AriIconViewerPreviewLabel`;
+	string $command = ("set /P <NUL=\""+ $path +"\" | clip");
+	system ($command);
+}
+global proc AriIconViewer_buttonGo(string $png,int $wid, int $hei){
+	global string $AriIconViewer_UI_PreviewIcon;
+	global string $AriIconViewerPreviewLabel;
+	global string $AriIconViewer_UI_SizeX_TF;
+	global string $AriIconViewer_UI_SizeY_TF;
+	//print $wid;
+	iconTextButton -e -i $png ($AriIconViewer_UI_PreviewIcon);
+	textField -e -text $png $AriIconViewerPreviewLabel;
+	textField -e -text $wid $AriIconViewer_UI_SizeX_TF;
+	textField -e -text $hei $AriIconViewer_UI_SizeY_TF;
+}
+global proc AriIconViewer_save(){
+	global string $AriIconViewer_UI_PreviewIcon;
+	string $png=`iconTextButton -q -i $AriIconViewer_UI_PreviewIcon`;
+	global string $AriIconViewerSavePath;
+	if ($AriIconViewerSavePath=="")$AriIconViewerSavePath=`internalVar -ubd`;
+	string $defDirectory=$AriIconViewerSavePath+$png;
+	string $pathList[]=`fileDialog2 -ds 2 -fm 0 -sff $png -ff "PNG (*.png)" -dir $defDirectory`;
+	string $path=$pathList[0];
+	if(endsWith($path,".png")){
+		//print $path;
+		resourceManager -saveAs $png $path;
+		string $basename = basename( $path, "");
+		$AriIconViewerSavePath = startString ($path,size($path)-size($basename));
+	}
+}
+global proc AriIconViewer_SearchIconSize(){
+	global string $AriIconViewer_Data_AllPngList[];
+	global vector $AriIconViewer_Data_AllIconList_Size[];
+	global string $AriIconViewer_UI_IconSizeMinMax_IF[];
+	global string $AriIconViewer_UI_IconSizeMinMax_CB[];
+	string $allPng[] = $AriIconViewer_Data_AllPngList;
+	string $pngList[];
+	int $W_minCB = `checkBox -q -v $AriIconViewer_UI_IconSizeMinMax_CB[0]`;
+	int $W_maxCB = `checkBox -q -v $AriIconViewer_UI_IconSizeMinMax_CB[1]`;
+	int $H_minCB = `checkBox -q -v $AriIconViewer_UI_IconSizeMinMax_CB[2]`;
+	int $H_maxCB = `checkBox -q -v $AriIconViewer_UI_IconSizeMinMax_CB[3]`;
+	int $W_minSize = `intField -q -v $AriIconViewer_UI_IconSizeMinMax_IF[0]`;
+	int $W_maxSize = `intField -q -v $AriIconViewer_UI_IconSizeMinMax_IF[1]`;
+	int $H_minSize = `intField -q -v $AriIconViewer_UI_IconSizeMinMax_IF[2]`;
+	int $H_maxSize = `intField -q -v $AriIconViewer_UI_IconSizeMinMax_IF[3]`;
+	intField -e -en $W_minCB $AriIconViewer_UI_IconSizeMinMax_IF[0];
+	intField -e -en $W_maxCB $AriIconViewer_UI_IconSizeMinMax_IF[1];
+	intField -e -en $H_minCB $AriIconViewer_UI_IconSizeMinMax_IF[2];
+	intField -e -en $H_maxCB $AriIconViewer_UI_IconSizeMinMax_IF[3];
+	for($ii=0; $ii<=size($allPng); $ii++){
+		vector $iconSize = $AriIconViewer_Data_AllIconList_Size[$ii];
+		int $listUpTrue = true;
+		if($W_minCB==true && $iconSize.x < $W_minSize)$listUpTrue = false;
+		if($W_maxCB==true && $iconSize.x > $W_maxSize)$listUpTrue = false;
+		if($H_minCB==true && $iconSize.y < $H_minSize)$listUpTrue = false;
+		if($H_maxCB==true && $iconSize.y > $H_maxSize)$listUpTrue = false;
+		if($listUpTrue){
+			$pngList[size($pngList)] = $allPng[$ii];
+		}
+	}
+	AriIconViewer_ListGo($pngList, 0);
+}
+global proc AriIconViewer_SearchIconSizeButton(int $size){
+	global string $AriIconViewer_UI_IconSizeMinMax_IF[];
+	global string $AriIconViewer_UI_IconSizeMinMax_CB[];
+	if($size != -1){
+		checkBox -e -v true $AriIconViewer_UI_IconSizeMinMax_CB[0];
+		checkBox -e -v true $AriIconViewer_UI_IconSizeMinMax_CB[1];
+		checkBox -e -v true $AriIconViewer_UI_IconSizeMinMax_CB[2];
+		checkBox -e -v true $AriIconViewer_UI_IconSizeMinMax_CB[3];
+		intField -e -v $size $AriIconViewer_UI_IconSizeMinMax_IF[0];
+		intField -e -v $size $AriIconViewer_UI_IconSizeMinMax_IF[1];
+		intField -e -v $size $AriIconViewer_UI_IconSizeMinMax_IF[2];
+		intField -e -v $size $AriIconViewer_UI_IconSizeMinMax_IF[3];
+	}
+	else{
+		checkBox -e -v false $AriIconViewer_UI_IconSizeMinMax_CB[0];
+		checkBox -e -v false $AriIconViewer_UI_IconSizeMinMax_CB[1];
+		checkBox -e -v false $AriIconViewer_UI_IconSizeMinMax_CB[2];
+		checkBox -e -v false $AriIconViewer_UI_IconSizeMinMax_CB[3];
+	}
+	AriIconViewer_SearchIconSize();
+}
+global proc AriIconViewer_IconSizeChange(){
+	global string $AriIconViewer_Data_IconList_UI[];
+	global vector $AriIconViewer_Data_IconList_Size[];
+	global string $AriIconViewer_UI_IconViewSize_IF;
+	global string $AriIconViewer_UI_IconViewMaxWH_IF[];
+	int $targetW = `intSliderGrp -q -v $AriIconViewer_UI_IconViewMaxWH_IF[0] `;
+	int $targetH = `intSliderGrp -q -v $AriIconViewer_UI_IconViewMaxWH_IF[1] `;
+	for($ii=0; $ii<size($AriIconViewer_Data_IconList_UI); $ii++){
+		vector $sizeVec = $AriIconViewer_Data_IconList_Size[$ii];
+		int $iconSizeW = ($sizeVec.x);
+		int $iconSizeH = ($sizeVec.y);
+		if($iconSizeW > $targetW)$iconSizeW = $targetW;
+		if($iconSizeH > $targetH)$iconSizeH = $targetH;
+		iconTextButton -e -w ($iconSizeW+3) -h ($iconSizeH+3) $AriIconViewer_Data_IconList_UI[$ii];
+	}
+}
+global proc AriIconViewer_ListGo(string $pngList[], int $mode){
+	global string $AriIconViewer_UI_PreviewIcon;
+	global string $AriIconViewerSarchField;
+	global string $AriIconViewerFlowLayout;
+	global string $AriIconViewerScrollLayout;
+	global string $AriIconViewer_UI_SearchLabel;
+	global string $AriIconViewer_UI_abcLabel;
+	global string $AriIconViewer_UI_LineTotalIF;
+	global string $AriIconViewer_UI_IconTotalIF[];
+	global string $AriIconViewer_Data_pngList[];
+	global string $AriIconViewer_Data_IconList_UI[];
+	global vector $AriIconViewer_Data_IconList_Size[];
+	global string $AriIconViewer_Data_AllPngList[];
+	global vector $AriIconViewer_Data_AllIconList_Size[];
+	string $alphabet[] = {"-","A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z","-"};
+	string $textABC = `textField -q -text $AriIconViewer_UI_abcLabel`;
+	string $searchText = `textField -q -text $AriIconViewer_UI_SearchLabel`;
+	int $LineTotal = `intField -q -v $AriIconViewer_UI_LineTotalIF`;
+	string $png;
+	int $counter = 0;
+	string $initialList[];
+	if($textABC != "ALL"){
+		string $toupperABC = toupper($textABC);
+		for($png in $pngList){
+			string $touPngText = toupper($png);
+			if(startsWith($touPngText,$toupperABC)){
+				$initialList[$counter] = $png;
+				$counter++;
+			}
+		}
+	}
+	else{
+		$initialList = $pngList;
+	}
+	string $viewPngList[];
+	$counter = 0;
+	for($png in $initialList){
+		string $touPngText = toupper($png);
+		string $touSearchText = toupper($searchText);
+		if(`gmatch $touPngText ("*"+$touSearchText+"*")`){
+			if($png != ""){
+				$viewPngList[$counter] = $png;
+				$counter++;
+			}
+		}
+	}
+	if(`columnLayout -ex $AriIconViewerFlowLayout`){
+		deleteUI $AriIconViewerFlowLayout;
+	}
+	$AriIconViewerFlowLayout = `columnLayout -adj true -p $AriIconViewerScrollLayout`;
+	string $iconTextList[];
+	string $iconCol;
+	string $iconRow;
+	int $abcNum = 0;
+	int $oneTrue = true;
+	string $etcList[];
+	int $rowCount = 0;
+	/*
+	rowLayout -nc 2 -adj 2 -p $AriIconViewerFlowLayout;
+	button -l $alphabet[$abcNum] -bgc 0 0 0;
+	$iconCol = `columnLayout -adj true `;
+	$iconRow = `rowLayout -nc 1000`;
+	setParent..;
+	setParent..;
+	setParent..;
+	*/
+	for($png in $viewPngList){
+		string $oneString = `toupper (startString($png,1))`;
+		if($alphabet[$abcNum] != $oneString){
+			$rowCount = 0;
+			int $alphaTrue = false;
+			for($ii=0; $ii < size($alphabet); $ii++){
+				if($alphabet[$ii] == $oneString){
+					$alphaTrue = true;
+					break;
+				}
+			}
+			if($alphaTrue){
+				$abcNum=$ii;
+				$oneTrue = true;
+			}
+		}
+		if($oneTrue){
+			$oneTrue = false;
+			rowLayout -nc 2 -adj 2 -p $AriIconViewerFlowLayout;
+			button -w 20 -h 30 -l $alphabet[$abcNum] -bgc 0 0 0;
+			$iconCol = `columnLayout -adj true `;
+			$iconRow = `rowLayout -nc 1000`;
+			setParent..;
+			separator -p $AriIconViewerFlowLayout;
+			setParent..;
+			setParent..;
+		}
+		if($png == ""){
+			continue;
+		}
+		$iconTextList[size($iconTextList)] = `iconTextButton -bgc 0.4 0.4 0.4 -i $png -p $iconRow`;
+		$rowCount++;
+		if($rowCount >= $LineTotal){
+			$rowCount = 0;
+			$iconRow = `rowLayout -nc 1000 -p $iconCol`;
+		}
+	}
+	refresh;
+	int $num = 0;
+	clear $AriIconViewer_Data_pngList;
+	clear $AriIconViewer_Data_IconList_UI;
+	clear $AriIconViewer_Data_IconList_Size;
+	if($mode==1){
+		clear $AriIconViewer_Data_AllPngList;
+		clear $AriIconViewer_Data_AllIconList_Size;
+	}
+	for($iconText in $iconTextList){
+		string $label = `iconTextButton -q -i $iconText`;
+		int $wid = `iconTextButton -q -w $iconText`;
+		int $hei = `iconTextButton -q -h $iconText`;
+		string $png = `iconTextButton -q -i $iconText`;
+		$AriIconViewer_Data_pngList[$num]       = $png;
+		$AriIconViewer_Data_IconList_UI[$num]   = $iconText;
+		$AriIconViewer_Data_IconList_Size[$num] = <<$wid-3,$hei-3,0>>;
+		if($mode==1){
+			$AriIconViewer_Data_AllPngList       = $AriIconViewer_Data_pngList;
+			$AriIconViewer_Data_AllIconList_Size = $AriIconViewer_Data_IconList_Size;
+			intField -e -v (size($AriIconViewer_Data_AllPngList)) -bgc 0.2 0.2 0.2 $AriIconViewer_UI_IconTotalIF[1];
+		}
+		$num++;
+		int $viewW = $wid-3;
+		int $viewH = $hei-3;
+		iconTextButton -e -c ("AriIconViewer_buttonGo(\""+$png+ "\","+$viewW+","+$viewH+")") $iconText;
+	}
+	setParent..;
+	AriIconViewer_IconSizeChange();
+	int $iconViewTotal = size($viewPngList);
+	int $iconAllTotal  = `intField -q -v $AriIconViewer_UI_IconTotalIF[1]`;
+	vector $rgb;
+	if($iconViewTotal == $iconAllTotal)$rgb = <<0.2, 0.2, 0.2>>;
+	else $rgb = <<0.7, 0.4, 0.4>>;
+	intField -e  -bgc ($rgb.x) ($rgb.y) ($rgb.z) -v ($iconViewTotal) $AriIconViewer_UI_IconTotalIF[0];
+}
+global proc AriIconViewer_SearchCancel(){
+	global string $AriIconViewer_UI_SearchLabel;
+	textField -e -text "" $AriIconViewer_UI_SearchLabel;
+	AriIconViewer_Go(0);
+}
+global proc AriIconViewer_Go(int $mode){
+	string $pngList[];
+	$pngList = `resourceManager -nameFilter "*.png"`;
+	AriIconViewer_ListGo($pngList, $mode);
+	AriIconViewer_SearchIconSize();
+}
+global proc AriIconViewer_abcChange(string $textABC){
+	global string $AriIconViewer_UI_abcLabel;
+	vector $rgb;
+	if($textABC == "ALL")$rgb = <<0.2, 0.2, 0.2>>;
+	else $rgb = <<0.7, 0.4, 0.4>>;
+	textField -e -bgc ($rgb.x) ($rgb.y) ($rgb.z) -text $textABC $AriIconViewer_UI_abcLabel;
+	AriIconViewer_Go(0);
+}
+global proc AriIconViewer(){
+	global string $AriIconViewer_UI_PreviewIcon;
+	global string $AriIconViewerPreviewLabel;
+	global string $AriIconViewerSarchField;
+	global string $AriIconViewerScrollLayout;
+	global string $AriIconViewer_UI_SearchLabel;
+	global string $AriIconViewer_UI_abcLabel;
+	global string $AriIconViewer_UI_SizeX_TF;
+	global string $AriIconViewer_UI_SizeY_TF;
+	global string $AriIconViewer_UI_IconViewSize_IF;
+	global string $AriIconViewer_UI_IconViewMaxWH_IF[];
+	global string $AriIconViewer_UI_IconSizeMinMax_IF[];
+	global string $AriIconViewer_UI_IconSizeMinMax_CB[];
+	global string $AriIconViewer_UI_LineTotalIF;
+	global string $AriIconViewer_UI_IconTotalIF[];
+	string $alphabet[] = {"A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z"};
+	if((`window -ex  AriIconViewer`)==true)deleteUI AriIconViewer;
+	window -title "AriIconViewer"  -w 400 -h 100 AriIconViewer;
+	string $form = `formLayout`;
+	$AriIconViewer_UI_PreviewIcon  = `iconTextButton -i "commandButton.png" -bgc 0.2 0.2 0.2`;
+	string $pngName = `columnLayout -adj true`;
+		rowLayout -nc 2;
+		$AriIconViewerPreviewLabel     = `textField -ed false -text "commandButton.png" -w 200`;
+		popupMenu -button 1;
+            menuItem -l "Copy" -c "AriIconViewer_ClipBoad()";
+		popupMenu -button 3;
+			menuItem -l "Copy" -c "AriIconViewer_ClipBoad()";
+		button -h 20 -l "Save" -c "AriIconViewer_save" -w 48;
+		setParent..;
+		rowLayout -nc 4;
+		$AriIconViewer_UI_SizeX_TF = `textField -ed false -w 40`;
+		$AriIconViewer_UI_SizeY_TF = `textField -ed false -w 40`;
+		setParent..;
+	setParent..;
+	string $searchUI = `columnLayout -adj true -w 248`;
+	separator;
+	rowLayout -nc 6;
+	$AriIconViewer_UI_SearchLabel  = `textField -cc "AriIconViewer_Go(0)" -w 100`;
+	iconTextButton -bgc 0.4 0.4 0.4 -i "search.png" -c "AriIconViewer_Go(0)";
+	iconTextButton -w 23 -h 23 -bgc 0.6 0.6 0.6 -i "SP_TitleBarCloseButton.png" -c "AriIconViewer_SearchCancel()";
+	$AriIconViewer_UI_IconTotalIF[0] = `intField -w 40 -ed false`;
+	text -l "/";
+	$AriIconViewer_UI_IconTotalIF[1] = `intField -w 40 -ed false`;
+	setParent..;
+	setParent..;
+	string $buttonABC = `columnLayout -adj true`; 
+	rowLayout -nc 30;
+	$AriIconViewer_UI_abcLabel = `textField -w 30 -ed false -text "ALL"`;
+	for($text in  $alphabet){
+		button -l $text -w 16 -c ("AriIconViewer_abcChange(\""+$text+"\")");
+	}
+	button -l "ALL" -w 40 -bgc 0.6 0.6 0.6 -c ("AriIconViewer_abcChange(\"ALL\")");
+	setParent..;
+	rowLayout -nc 32;
+	$AriIconViewer_UI_IconSizeMinMax_CB[0] = `checkBox -l "W_Min"  -cc "AriIconViewer_SearchIconSize()"`;
+	$AriIconViewer_UI_IconSizeMinMax_IF[0] = `intField -v 4  -w 30 -cc "AriIconViewer_SearchIconSize()"`;
+	$AriIconViewer_UI_IconSizeMinMax_CB[1] = `checkBox -l "W_Max"  -cc "AriIconViewer_SearchIconSize()"`;
+	$AriIconViewer_UI_IconSizeMinMax_IF[1] = `intField -v 32 -w 30 -cc "AriIconViewer_SearchIconSize()"`;
+	separator -w 10 -h 30 -hr false;
+	$AriIconViewer_UI_IconSizeMinMax_CB[2] = `checkBox -l "H_Min"  -cc "AriIconViewer_SearchIconSize()"`;
+	$AriIconViewer_UI_IconSizeMinMax_IF[2] = `intField -v 4  -w 30 -cc "AriIconViewer_SearchIconSize()"`;
+	$AriIconViewer_UI_IconSizeMinMax_CB[3] = `checkBox -l "H_Max"  -cc "AriIconViewer_SearchIconSize()"`;
+	$AriIconViewer_UI_IconSizeMinMax_IF[3] = `intField -v 32 -w 30 -cc "AriIconViewer_SearchIconSize()"`;
+	separator -w 10 -h 30 -hr false;
+	button -l "20"  -c "AriIconViewer_SearchIconSizeButton(20)";
+	button -l "32"  -c "AriIconViewer_SearchIconSizeButton(32)";
+	button -l "OFF" -bgc 0.6 0.6 0.6 -c "AriIconViewer_SearchIconSizeButton(-1)";
+	setParent..;
+	separator;
+	rowLayout -nc 7;
+	text -l "W_Max:";
+	$AriIconViewer_UI_IconViewMaxWH_IF[0] = `intSliderGrp -w 160 -cw 1 30 -min 8 -max 256 -f true -v 128 -cc "AriIconViewer_IconSizeChange()"`;
+	text -l " H_Max:";
+	$AriIconViewer_UI_IconViewMaxWH_IF[1] = `intSliderGrp -w 160 -cw 1 30 -min 8 -max 256 -f true -v 32 -cc "AriIconViewer_IconSizeChange()"`;
+	text -l " LineTotal:";
+	$AriIconViewer_UI_LineTotalIF = `intField -w 30 -min 1 -max 1000 -v 20 -cc "AriIconViewer_Go(0)"`;
+	setParent..;
+	separator;
+	setParent..;
+	setParent..;
+	$AriIconViewerScrollLayout = `scrollLayout -cr true -mcw 200`;
+	setParent..;
+	setParent..;
+	setParent..;
+	formLayout -edit 
+	-af $pngName "top"   0
+	-af $pngName "left"  0
+	-af $AriIconViewer_UI_PreviewIcon "top"   0
+	-ac $AriIconViewer_UI_PreviewIcon "left"  0 $pngName
+	-ac $searchUI "top"  0 $pngName
+	-af $searchUI "left" 0 
+	-ac $buttonABC "top"   0 $searchUI
+	-af $buttonABC "left"  0
+	-af $buttonABC "right" 0
+	-ac $AriIconViewerScrollLayout "top"    0 $buttonABC
+	-af $AriIconViewerScrollLayout "left"   0
+	-af $AriIconViewerScrollLayout "bottom" 0
+	-af $AriIconViewerScrollLayout "right"  0
+	$form;
+	showWindow;
+	AriIconViewer_Go(1);
+}
